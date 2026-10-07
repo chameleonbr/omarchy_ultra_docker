@@ -2243,7 +2243,7 @@ function logsCommand(id, tail) {
 // because the loop is the thing to fix first.
 function badKind(container) {
   if (String(container.state) === "restarting") return "restarting"
-  if (String(container.health) === "unhealthy") return "unhealthy"
+  if (String(container.state) === "running" && String(container.health) === "unhealthy") return "unhealthy"
   if (String(container.state) === "exited") return "failed"
   return "degraded"
 }

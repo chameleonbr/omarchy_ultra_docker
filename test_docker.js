@@ -1566,6 +1566,25 @@ check("a container that breaks is announced once, not on every read", () => {
   assert.deepStrictEqual(still.announce, [], "no repeat while the condition holds")
 })
 
+check("an exited container ignores stale unhealthy status", () => {
+  const container = parsePs(JSON.stringify({
+    ID: "a", Names: "api", State: "exited",
+    Status: "Exited (1) Less than a second ago", HealthStatus: "unhealthy"
+  }))[0]
+
+  assert.strictEqual(container.cell, "bad")
+  assert.strictEqual(container.state, "exited")
+  assert.strictEqual(container.health, "unhealthy")
+
+  const first = notifications([container], {})
+  assert.strictEqual(first.announce.length, 1)
+  assert.strictEqual(first.announce[0].kind, "failed")
+  assert.strictEqual(changeNotification(first.announce[0]).bodyKey, "notify.failed")
+
+  const again = notifications([container], first.memo)
+  assert.deepStrictEqual(again.announce, [], "no repeat while the condition holds")
+})
+
 check("a restart loop is one condition, not a notification every minute", () => {
   // The bug this replaced, reproduced from the real history: a flapping
   // container passes through `running` between restarts, that read as a
@@ -1624,6 +1643,7 @@ check("the worst condition is the one named", () => {
   // Restarting outranks unhealthy: the loop is what you fix first.
   assert.strictEqual(badKind({ state: "restarting", health: "unhealthy" }), "restarting")
   assert.strictEqual(badKind({ state: "running", health: "unhealthy" }), "unhealthy")
+  assert.strictEqual(badKind({ state: "exited", health: "unhealthy" }), "failed")
   assert.strictEqual(badKind({ state: "exited", health: "none" }), "failed")
   assert.strictEqual(badKind({ state: "paused", health: "none" }), "degraded")
 })
