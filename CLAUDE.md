@@ -447,25 +447,38 @@ it before `eval`.
 ## Settings
 
 The screen is `settingsSurface` in `Panel.qml`, and it is **built from
-`manifest.json`'s own `schema`**, read back out of the shell's plugin registry
-(`bar.shell.pluginRegistry.installedPlugins[pluginId].barWidget.schema`). There
-is no second copy of the field list in QML. Adding a setting means adding it to
-the manifest and to `SETTINGS_SECTIONS` in `Docker.js`; a key in the schema and
-in no section lands in a trailing "other" section rather than disappearing, and
-a test fails when that happens.
+`manifest.json`'s own `schema`**. There is no second copy of the field list in
+QML. Adding a setting means adding it to the manifest and to `SETTINGS_SECTIONS`
+in `Docker.js`; a key in the schema and in no section lands in a trailing
+"other" section rather than disappearing, and a test fails when that happens.
 
-Writes go **straight through `pluginRegistry.setBarWidget(id, key, value, {})`**,
-not out to `omarchy bar set` and back. That is safe while the panel is open
-because `Bar.applyBarConfig` diffs the new layout with
+**The schema comes from the service, not from the widget.** A third-party bar
+widget's `bar` is a `PluginBarApi` facade whose `shell` is a scoped
+`PluginShellApi` — `serviceFor`, `summon`, `hide`, `toggle`, `isPluginOpen`,
+`updateEntryInline`, `mutateShellConfig`, and **no `pluginRegistry`**. So
+`bar.shell.pluginRegistry` is `undefined` and a schema read off it is empty,
+which is how the screen shipped rendering nothing under its header. Service
+entry points ARE given a scoped `PluginRegistryApi` when they declare
+`property var pluginRegistry`; `Service.settingsSchema` reads
+`pluginRegistry.installedPlugins[pluginRegistry.pluginId].barWidget.schema`
+from it, and `Panel.settingsSchema` is that service property.
+
+Writes go **through `bar.shell.updateEntryInline(id, settings)`**. It
+**replaces the whole entry** with `{id, ...settings}`, so `Panel.writeSetting`
+merges the current `settings` with the one changed key before calling it — a
+write of just the changed key wipes every other key. It is safe while the panel
+is open because `Bar.applyBarConfig` diffs the new layout with
 `BarModel.inlineSettingsDelta` and patches live widgets in place when only
 inline settings changed — it does not rebuild them. If it did, every widget
 would be torn down mid-edit and the panel would vanish under the user on each
 change. Verified by diffing `shell.json` around an open/close of the screen: no
 write happens just from opening it.
 
-`canWriteSettings` guards the call. A shell without `setBarWidget` gets a
+`canWriteSettings` guards the call. A shell without `updateEntryInline` gets a
 message naming `omarchy bar set`, because every control looking live and doing
-nothing is this plugin's most-repeated failure.
+nothing is this plugin's most-repeated failure. `updateEntryInline` returns
+`false` both for "no change" and for a refusal, so the value comparison before
+the call is what tells a real write from a no-op.
 
 **Read each setting with `setting(key, fallback)`, never off the `settings`
 object.** The host injects only the keys present in that widget's `shell.json`

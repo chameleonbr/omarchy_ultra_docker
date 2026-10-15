@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The settings screen rendered empty, and writes had nowhere to go.** A
+  third-party bar widget's `bar.shell` is a scoped `PluginShellApi` with no
+  `pluginRegistry` on it, so the screen never found the manifest schema. The
+  schema is now read from the service, which the shell does inject a scoped
+  registry into, and writes go through `bar.shell.updateEntryInline`.
+
 ## 1.1.0
 
 A settings screen, a keyboard, and a plugin that works on Omarchy's current

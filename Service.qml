@@ -23,6 +23,19 @@ import "I18n.js" as I18n
 Item {
   id: root
 
+  // The shell injects a scoped, read-only registry view into service entry
+  // points. That view carries this plugin's own manifest, which is the single
+  // source of the settings field list. The bar widget is NOT given it (its
+  // `bar.shell` is a PluginShellApi), so the widget reads the schema from here.
+  property var pluginRegistry: null
+
+  readonly property var settingsSchema: {
+    var registry = pluginRegistry
+    if (!registry || !registry.pluginId || !registry.installedPlugins) return []
+    var manifest = registry.installedPlugins[registry.pluginId]
+    return manifest && manifest.barWidget ? (manifest.barWidget.schema || []) : []
+  }
+
   // ------------------------------------------------------------- state
 
   property var containers: []
